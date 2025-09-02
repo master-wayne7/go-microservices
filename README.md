@@ -8,7 +8,7 @@ This project implements a microservices architecture with the following componen
 
 ### Services
 - **Account Service** (`/account`) - User account management with gRPC API
-- **Catalog Service** (`/catalog`) - Product catalog management (in development)
+- **Catalog Service** (`/catalog`) - Product catalog management with Elasticsearch backend ✅ **COMPLETED**
 - **Order Service** (`/order`) - Order processing (in development)
 - **GraphQL Gateway** (`/graphql`) - Unified API gateway using GraphQL
 
@@ -16,7 +16,7 @@ This project implements a microservices architecture with the following componen
 - **Language**: Go 1.25.0
 - **gRPC**: Inter-service communication
 - **GraphQL**: API gateway with gqlgen
-- **Database**: PostgreSQL (planned for each service)
+- **Database**: PostgreSQL (account service), Elasticsearch (catalog service)
 - **Containerization**: Docker & Docker Compose
 - **Protocol Buffers**: Service contracts
 
@@ -30,7 +30,13 @@ go-microservices/
 │   ├── service.go     # Business logic
 │   ├── repository.go  # Data access layer
 │   └── pb/           # Generated protobuf files
-├── catalog/          # Catalog microservice (in development)
+├── catalog/          # Catalog microservice ✅ COMPLETED
+│   ├── catalog.proto # gRPC service definition
+│   ├── server.go     # gRPC server implementation
+│   ├── service.go    # Business logic
+│   ├── repository.go # Elasticsearch data layer
+│   ├── client.go     # gRPC client library
+│   └── pb/          # Generated protobuf files
 ├── order/            # Order microservice (in development)
 ├── graphql/          # GraphQL API gateway
 │   ├── schema.graphql # GraphQL schema
@@ -46,7 +52,8 @@ go-microservices/
 - Go 1.25.0 or later
 - Protocol Buffers compiler (`protoc`)
 - Docker and Docker Compose
-- PostgreSQL (for database services)
+- PostgreSQL (for account service)
+- Elasticsearch (for catalog service)
 
 ### Installation
 
@@ -69,7 +76,12 @@ go-microservices/
 
 4. **Generate protobuf files**
    ```bash
+   # For account service
    cd account
+   go generate
+   
+   # For catalog service
+   cd ../catalog
    go generate
    ```
 
@@ -81,7 +93,8 @@ go-microservices/
 docker-compose up
 
 # Or run individual services
-cd account && go run cmd/main.go
+cd account && go run cmd/account/main.go
+cd catalog && go run cmd/catalog/main.go
 cd graphql && go run main.go
 ```
 
@@ -116,15 +129,15 @@ docker-compose up --build
 
 ### gRPC Services
 - **Account Service**: `localhost:50051`
-- **Catalog Service**: `localhost:50052` (planned)
+- **Catalog Service**: `localhost:8080` ✅ **ACTIVE**
 - **Order Service**: `localhost:50053` (planned)
 
 ## 🗄️ Database Schema
 
-Each microservice will have its own database:
-- `account_db` - User accounts
-- `catalog_db` - Product catalog
-- `order_db` - Orders and transactions
+Each microservice has its own database:
+- `account_db` - User accounts (PostgreSQL)
+- `catalog_db` - Product catalog (Elasticsearch) ✅ **IMPLEMENTED**
+- `order_db` - Orders and transactions (planned)
 
 ## 🔄 Service Communication
 
@@ -140,6 +153,7 @@ go test ./...
 
 # Run specific service tests
 go test ./account/...
+go test ./catalog/...
 go test ./graphql/...
 ```
 
@@ -173,15 +187,34 @@ This project is under development and subject to change.
 
 ## 🔮 Roadmap
 
-- [ ] Complete Catalog Service implementation
+- [x] Complete Catalog Service implementation ✅
 - [ ] Complete Order Service implementation
-- [ ] Add authentication and authorization
-- [ ] Implement event sourcing
 - [ ] Add monitoring and logging
-- [ ] Kubernetes deployment
-- [ ] CI/CD pipeline
-- [ ] Performance testing
+
+
+## 🎯 Catalog Service Features
+
+The **Catalog Service** is now fully implemented and provides:
+
+### Core Functionality
+- **Product Management**: Create, retrieve, and search products
+- **Elasticsearch Integration**: High-performance search and indexing
+- **gRPC API**: Efficient inter-service communication
+- **Client Library**: Easy integration for other services
+
+### API Endpoints
+- `PostProduct` - Create new products
+- `GetProduct` - Retrieve product by ID
+- `GetProducts` - List products with pagination, filtering, and search
+- `SearchProducts` - Full-text search capabilities
+
+### Technical Features
+- **Elasticsearch Backend**: Scalable document storage and search
+- **Connection Pooling**: Optimized HTTP transport configuration
+- **Error Handling**: Comprehensive error management
+- **Retry Logic**: Automatic connection retry with exponential backoff
+- **Docker Ready**: Containerized deployment support
 
 ---
 
-**Note**: This project is currently under active development. Some services and features may be incomplete or subject to change.
+**Note**: This project is currently under active development. The Account and Catalog services are fully implemented, with Order service and additional features in development.
