@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-type grcpServer struct {
+type grpcServer struct {
 	pb.UnimplementedAccountServiceServer
 	service Service
 }
@@ -23,12 +23,12 @@ func ListenGRPC(s Service, port int) error {
 	}
 
 	serv := grpc.NewServer()
-	pb.RegisterAccountServiceServer(serv, &grcpServer{service: s, UnimplementedAccountServiceServer: pb.UnimplementedAccountServiceServer{}})
+	pb.RegisterAccountServiceServer(serv, &grpcServer{service: s, UnimplementedAccountServiceServer: pb.UnimplementedAccountServiceServer{}})
 	reflection.Register(serv)
 	return serv.Serve(lis)
 }
 
-func (s *grcpServer) PostAccount(ctx context.Context, r *pb.PostAccountRequest) (*pb.PostAccountResponse, error) {
+func (s *grpcServer) PostAccount(ctx context.Context, r *pb.PostAccountRequest) (*pb.PostAccountResponse, error) {
 	a, err := s.service.PostAccount(ctx, r.Name)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func (s *grcpServer) PostAccount(ctx context.Context, r *pb.PostAccountRequest) 
 	}, nil
 }
 
-func (s *grcpServer) GetAccount(ctx context.Context, r *pb.GetAccountRequest) (*pb.GetAccountResponse, error) {
+func (s *grpcServer) GetAccount(ctx context.Context, r *pb.GetAccountRequest) (*pb.GetAccountResponse, error) {
 	a, err := s.service.GetAccount(ctx, r.Id)
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (s *grcpServer) GetAccount(ctx context.Context, r *pb.GetAccountRequest) (*
 	}, nil
 }
 
-func (s *grcpServer) GetAccounts(ctx context.Context, r *pb.GetAccountsRequest) (*pb.GetAccountsResponse, error) {
+func (s *grpcServer) GetAccounts(ctx context.Context, r *pb.GetAccountsRequest) (*pb.GetAccountsResponse, error) {
 	a, err := s.service.GetAccounts(ctx, r.Skip, r.Take)
 	if err != nil {
 		return nil, err
