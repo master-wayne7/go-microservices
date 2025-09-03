@@ -1,8 +1,134 @@
+# ### CHANGE THIS ####
+# Docker Compose configuration with proper port mappings and health checks
 services:
   account:
+    build:
+      context: .
+      dockerfile: account/app.dockerfile
+    ports:
+      - "8081:8081"  # Main service port
+      - "8082:8082"  # Health check port
+    environment:
+      - DATABASE_URL=postgres://postgres:password@account_db:5432/account?sslmode=disable
+    depends_on:
+      account_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   catalog:
+    build:
+      context: .
+      dockerfile: catalog/app.dockerfile
+    ports:
+      - "8083:8083"  # Main service port
+      - "8084:8084"  # Health check port
+    environment:
+      - DATABASE_URL=http://catalog_db:9200
+    depends_on:
+      catalog_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   order:
+    build:
+      context: .
+      dockerfile: order/app.dockerfile
+    ports:
+      - "8085:8085"  # Main service port
+      - "8086:8086"  # Health check port
+    environment:
+      - DATABASE_URL=postgres://postgres:password@order_db:5432/order?sslmode=disable
+    depends_on:
+      order_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   graphql:
+    build:
+      context: .
+      dockerfile: graphql/app.dockerfile
+    ports:
+      - "8087:8087"  # Main GraphQL service port
+      - "8088:8088"  # Health check port
+    environment:
+      - ACCOUNT_SERVICE_URL=http://account:8081
+      - CATALOG_SERVICE_URL=http://catalog:8083
+      - ORDER_SERVICE_URL=http://order:8085
+    depends_on:
+      account:
+        condition: service_healthy
+      catalog:
+        condition: service_healthy
+      order:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ### CHANGE THIS ####
+  # Database services with health checks
   account_db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=account
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - account_data:/var/lib/postgresql/data
+      - ./account/up.sql:/docker-entrypoint-initdb.d/up.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   catalog_db:
+    image: elasticsearch:8.11.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    volumes:
+      - catalog_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   order_db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=order
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - order_data:/var/lib/postgresql/data
+      - ./order/up.sql:/docker-entrypoint-initdb.d/up.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  account_data:
+  catalog_data:
+  order_data:

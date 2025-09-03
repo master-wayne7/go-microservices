@@ -15,12 +15,27 @@ type AppConfig struct {
 	OrderUrl   string `envconfig:"ORDER_SERVICE_URL"`
 }
 
+// ### CHANGE THIS ####
+// Health check handler for container orchestration
+func healthCheck(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
+}
+
 func main() {
 	var cfg AppConfig
 	err := envconfig.Process("", &cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// ### CHANGE THIS ####
+	// Start health check server on separate port
+	go func() {
+		http.HandleFunc("/health", healthCheck)
+		log.Println("Health check server starting on port 8088...")
+		log.Fatal(http.ListenAndServe(":8088", nil))
+	}()
 
 	s, err := NewGraphQlServer(
 		cfg.AccountUrl,
@@ -34,5 +49,8 @@ func main() {
 	http.Handle("/graphql", handler.New(s.ToExecutableSchema()))
 	http.Handle("/playground", playground.Handler("playground", "/graphql"))
 
-	log.Fatal(http.ListenAndServe(":8000", nil))
+	// ### CHANGE THIS ####
+	// Changed port from 8000 to 8087 to avoid conflicts and maintain consistency
+	log.Println("GraphQL server starting on port 8087...")
+	log.Fatal(http.ListenAndServe(":8087", nil))
 }

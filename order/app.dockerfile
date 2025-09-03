@@ -1,5 +1,4 @@
-# ### CHANGE THIS ####
-# Multi-stage build for GraphQL service with security improvements
+# Multi-stage build for Order service with security improvements
 FROM golang:1.23-alpine AS build
 
 # Install build dependencies
@@ -12,13 +11,12 @@ WORKDIR /go/src/github.com/master-wayne7/go-microservices
 COPY go.mod go.sum ./
 COPY vendor vendor
 
-# Copy GraphQL service code
-COPY graphql graphql
+# Copy Order service code
+COPY order order
 
 # Build the application
-RUN GO111MODULE=on go build -mod vendor -o /go/bin/app ./graphql
+RUN GO111MODULE=on go build -mod vendor -o /go/bin/app ./order/cmd/order
 
-# ### CHANGE THIS ####
 # Production stage with security improvements
 FROM alpine:latest
 
@@ -41,16 +39,15 @@ RUN chown appuser:appgroup app
 # Switch to non-root user
 USER appuser
 
-# Expose GraphQL service port
-EXPOSE 8087
+# Expose main service port (changed from 8080 to 8085)
+EXPOSE 8085
 
 # Expose health check port
-EXPOSE 8088
+EXPOSE 8086
 
-# ### CHANGE THIS ####
 # Health check for container orchestration
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8088/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8086/health || exit 1
 
 # Start the application
 CMD ["app"]
