@@ -1,6 +1,11 @@
 package main
 
-import "github.com/99designs/gqlgen/graphql"
+import (
+	"github.com/99designs/gqlgen/graphql"
+	"github.com/master-wayne7/go-microservices/account"
+	"github.com/master-wayne7/go-microservices/catalog"
+	"github.com/master-wayne7/go-microservices/order"
+)
 
 type Server struct {
 	accountClient *account.Client

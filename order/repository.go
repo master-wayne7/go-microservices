@@ -138,7 +138,7 @@ func (r *postgresRepository) GetOrdersForAccount(ctx context.Context, accountId 
 		*lastOrder = *order
 	}
 
-	if lastOrder != nil {
+	if lastOrder.ID != "" {
 		newOrder := Order{
 			ID:         lastOrder.ID,
 			AccountID:  lastOrder.AccountID,
