@@ -11,11 +11,13 @@ A microservices-based e-commerce application built with Go, featuring gRPC servi
 - **Protocol Buffer Generation** - Successfully generated `order.pb.go` and `order_grpc.pb.go`
 - **Client Library** - Order service client for inter-service communication
 - **Docker Containerization** - Production-ready container with health checks
-
-### 🔧 **Current Work in Progress**
 - **GraphQL Mutation Resolvers** - Implementing order creation and management mutations
 - **GraphQL Integration** - Connecting Order service to GraphQL gateway
 - **API Gateway Enhancement** - Adding order operations to unified GraphQL API
+
+### 🔧 **Current Work in Progress**
+- **Bug Fixes** - Fixing some common known bugs
+- **Configure Databases** - Linking the PostgreSQL and Elastic Search DB 
 
 
 ---
