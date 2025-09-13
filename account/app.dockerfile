@@ -1,21 +1,16 @@
 # Multi-stage build for Account service with security improvements
-FROM golang:1.23-alpine AS build
+FROM golang:1.25-alpine AS build
 
-# Install build dependencies
 RUN apk --no-cache add gcc g++ make ca-certificates
 
-# Set working directory
 WORKDIR /go/src/github.com/master-wayne7/go-microservices
 
-# Copy dependency files
 COPY go.mod go.sum ./
-COPY vendor vendor
+RUN go mod download
 
-# Copy Account service code
 COPY account account
 
-# Build the application
-RUN GO111MODULE=on go build -mod vendor -o /go/bin/app ./account/cmd/account
+RUN go build -o /go/bin/app ./account/cmd/account
 
 # Production stage with security improvements
 FROM alpine:latest

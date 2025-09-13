@@ -22,6 +22,15 @@ func healthCheck(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("OK"))
 }
 
+func enforceJSONContentType(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Content-Type") == "" {
+			r.Header.Set("Content-Type", "application/json")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	var cfg AppConfig
 	err := envconfig.Process("", &cfg)
@@ -45,8 +54,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	http.Handle("/graphql", handler.New(s.ToExecutableSchema()))
+	graphqlHandler := handler.NewDefaultServer(s.ToExecutableSchema())
+	http.Handle("/graphql", enforceJSONContentType(graphqlHandler))
 	http.Handle("/playground", playground.Handler("playground", "/graphql"))
 
 	// ### CHANGE THIS ####

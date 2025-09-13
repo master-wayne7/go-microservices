@@ -64,6 +64,8 @@ services:
       - "8086:8086" # Health check port
     environment:
       - DATABASE_URL=postgres://postgres:password@order_db:5432/order?sslmode=disable
+      - ACCOUNT_SERVICE_URL=account:8081
+      - CATALOG_SERVICE_URL=catalog:8083
     depends_on:
       order_db:
         condition: service_healthy
@@ -91,9 +93,9 @@ services:
       - "8087:8087" # Main GraphQL service port
       - "8088:8088" # Health check port
     environment:
-      - ACCOUNT_SERVICE_URL=http://account:8081
-      - CATALOG_SERVICE_URL=http://catalog:8083
-      - ORDER_SERVICE_URL=http://order:8085
+      - ACCOUNT_SERVICE_URL=account:8081
+      - CATALOG_SERVICE_URL=catalog:8083
+      - ORDER_SERVICE_URL=order:8085
     depends_on:
       account:
         condition: service_healthy

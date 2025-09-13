@@ -1,21 +1,21 @@
 # Multi-stage build for Order service with security improvements
-FROM golang:1.23-alpine AS build
+FROM golang:1.25-alpine AS build
 
-# Install build dependencies
 RUN apk --no-cache add gcc g++ make ca-certificates
 
-# Set working directory
 WORKDIR /go/src/github.com/master-wayne7/go-microservices
 
-# Copy dependency files
+# Copy dependency files first
 COPY go.mod go.sum ./
-COPY vendor vendor
+RUN go mod download
 
-# Copy Order service code
+# Copy only what's needed for "order"
 COPY order order
+COPY account account
+COPY catalog catalog
 
-# Build the application
-RUN GO111MODULE=on go build -mod vendor -o /go/bin/app ./order/cmd/order
+# Build order service
+RUN go build -o /go/bin/app ./order/cmd/order
 
 # Production stage with security improvements
 FROM alpine:latest
