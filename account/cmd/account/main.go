@@ -7,6 +7,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/master-wayne7/go-microservices/account"
+	"github.com/master-wayne7/go-microservices/monitoring"
 	"github.com/tinrab/retry"
 )
 
@@ -27,25 +28,35 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Start health check server on separate port
+	// ✅ Initialize metrics only once
+	metrics := monitoring.NewMetricsCollector("account-service")
+	metrics.SetServiceInfo("1.0.0", "development")
+
+	// start health + metrics server
 	go func() {
-		http.HandleFunc("/health", healthCheck)
-		log.Println("Health check server starting on port 8082...")
-		log.Fatal(http.ListenAndServe(":8082", nil))
+		mux := http.NewServeMux()
+		mux.HandleFunc("/health", healthCheck)
+		mux.Handle("/metrics", metrics.PrometheusHandler()) // <--- use instance handler
+		log.Println("Health + metrics server starting on port 8082...")
+		log.Fatal(http.ListenAndServe(":8082", mux))
 	}()
 
+	// ✅ Connect to DB with retry
 	var r account.Repository
 	retry.ForeverSleep(2*time.Second, func(_ int) (err error) {
 		r, err = account.NewPostgresRepository(cfg.DatabaseURL)
 		if err != nil {
-			log.Println(err)
+			log.Println("DB connection failed, retrying...", err)
 		}
 		return
 	})
 	defer r.Close()
 
-	// Changed port from 8080 to 8081 to avoid conflicts
-	log.Println("Listening on port 8081...")
+	// ✅ Start system metrics collection (CPU, RAM, disk, uptime)
+	metrics.StartSystemMetricsCollection(nil)
+
+	// ✅ Start gRPC server with metrics interceptors
+	log.Println("Account service gRPC listening on port 8081...")
 	s := account.NewService(r)
-	log.Fatal(account.ListenGRPC(s, 8081))
+	log.Fatal(account.ListenGRPC(s, 8081, metrics))
 }

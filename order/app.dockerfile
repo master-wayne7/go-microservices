@@ -13,6 +13,7 @@ RUN go mod download
 COPY order order
 COPY account account
 COPY catalog catalog
+COPY monitoring monitoring
 
 # Build order service
 RUN go build -o /go/bin/app ./order/cmd/order

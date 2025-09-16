@@ -13,6 +13,7 @@ COPY graphql graphql
 COPY account account
 COPY catalog catalog
 COPY order order
+COPY monitoring monitoring
 
 RUN go build -o /go/bin/app ./graphql
 

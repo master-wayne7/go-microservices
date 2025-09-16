@@ -5,7 +5,7 @@ services:
       dockerfile: account/app.dockerfile
     ports:
       - "8081:8081" # Main service port
-      - "8082:8082" # Health check port
+      - "8082:8082" # Health check and metrics port
     environment:
       - DATABASE_URL=postgres://postgres:password@account_db:5432/account?sslmode=disable
     depends_on:
@@ -33,7 +33,7 @@ services:
       dockerfile: catalog/app.dockerfile
     ports:
       - "8083:8083" # Main service port
-      - "8084:8084" # Health check port
+      - "8084:8084" # Health check and metrics port
     environment:
       - DATABASE_URL=http://catalog_db:9200
     depends_on:
@@ -61,7 +61,7 @@ services:
       dockerfile: order/app.dockerfile
     ports:
       - "8085:8085" # Main service port
-      - "8086:8086" # Health check port
+      - "8086:8086" # Health check and metrics port
     environment:
       - DATABASE_URL=postgres://postgres:password@order_db:5432/order?sslmode=disable
       - ACCOUNT_SERVICE_URL=account:8081
@@ -91,7 +91,7 @@ services:
       dockerfile: graphql/app.dockerfile
     ports:
       - "8087:8087" # Main GraphQL service port
-      - "8088:8088" # Health check port
+      - "8088:8088" # Health check and metrics port
     environment:
       - ACCOUNT_SERVICE_URL=account:8081
       - CATALOG_SERVICE_URL=catalog:8083
@@ -165,7 +165,39 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # ### CHANGE THIS #### - Prometheus monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  # ### CHANGE THIS #### - Grafana visualization
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    restart: unless-stopped
+
 volumes:
   account_data:
   catalog_data:
   order_data:
+  prometheus_data:
+  grafana_data:

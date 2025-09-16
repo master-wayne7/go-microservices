@@ -7,6 +7,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/master-wayne7/go-microservices/catalog"
+	"github.com/master-wayne7/go-microservices/monitoring"
 	"github.com/tinrab/retry"
 )
 
@@ -27,9 +28,15 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// ### CHANGE THIS #### - Initialize Prometheus metrics
+	metrics := monitoring.NewMetricsCollector("catalog-service")
+	metrics.SetServiceInfo("1.0.0", "development")
+
 	// Start health check server on separate port
 	go func() {
 		http.HandleFunc("/health", healthCheck)
+		// ### CHANGE THIS #### - Add Prometheus metrics endpoint
+		http.Handle("/metrics", metrics.PrometheusHandler())
 		log.Println("Health check server starting on port 8084...")
 		log.Fatal(http.ListenAndServe(":8084", nil))
 	}()
@@ -44,8 +51,11 @@ func main() {
 	})
 	defer r.Close()
 
+	// ### CHANGE THIS #### - Start system metrics collection
+	metrics.StartSystemMetricsCollection(nil)
+
 	// Changed port from 8080 to 8083 to avoid conflicts
 	log.Println("Listening on port 8083...")
 	s := catalog.NewService(r)
-	log.Fatal(catalog.ListenGRPC(s, 8083))
+	log.Fatal(catalog.ListenGRPC(s, 8083, metrics))
 }

@@ -9,6 +9,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY catalog catalog
+COPY monitoring monitoring
 
 RUN go build -o /go/bin/app ./catalog/cmd/catalog
 

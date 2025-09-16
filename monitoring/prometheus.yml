@@ -1,0 +1,47 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  #  - Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["127.0.0.1:9090"]
+
+  #  - Account service metrics
+  - job_name: "account-service"
+    static_configs:
+      - targets: ["account:8082"]
+    metrics_path: "/metrics"
+    scrape_interval: 5s
+
+  #  - Catalog service metrics
+  - job_name: "catalog-service"
+    static_configs:
+      - targets: ["catalog:8084"]
+    metrics_path: "/metrics"
+    scrape_interval: 5s
+
+  #  - Order service metrics
+  - job_name: "order-service"
+    static_configs:
+      - targets: ["order:8086"]
+    metrics_path: "/metrics"
+    scrape_interval: 5s
+
+  #  - GraphQL service metrics
+  - job_name: "graphql-service"
+    static_configs:
+      - targets: ["graphql:8088"]
+    metrics_path: "/metrics"
+    scrape_interval: 5s
+
+  #  - Database metrics (if you add database exporters)
+  # - job_name: 'postgres-exporter'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+  #   scrape_interval: 10s

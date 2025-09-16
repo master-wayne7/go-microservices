@@ -1,0 +1,246 @@
+{
+    "id": null,
+    "title": "Go Microservices Monitoring",
+    "tags": [
+        "microservices",
+        "go",
+        "prometheus"
+    ],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+        {
+            "id": 1,
+            "title": "HTTP Requests Total",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "sum(rate(http_requests_total[5m])) by (service)",
+                    "legendFormat": "{{service}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "vis": false
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+            }
+        },
+        {
+            "id": 2,
+            "title": "HTTP Request Duration",
+            "type": "graph",
+            "targets": [
+                {
+                    "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) by (service)",
+                    "legendFormat": "95th percentile - {{service}}"
+                },
+                {
+                    "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[5m])) by (service)",
+                    "legendFormat": "50th percentile - {{service}}"
+                }
+            ],
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 0
+            }
+        },
+        {
+            "id": 3,
+            "title": "gRPC Requests Total",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "sum(rate(grpc_requests_total[5m])) by (service)",
+                    "legendFormat": "{{service}}"
+                }
+            ],
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 8
+            }
+        },
+        {
+            "id": 4,
+            "title": "gRPC Request Duration",
+            "type": "graph",
+            "targets": [
+                {
+                    "expr": "histogram_quantile(0.95, rate(grpc_request_duration_seconds_bucket[5m])) by (service)",
+                    "legendFormat": "95th percentile - {{service}}"
+                }
+            ],
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 8
+            }
+        },
+        {
+            "id": 5,
+            "title": "GraphQL Requests Total",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "sum(rate(graphql_requests_total[5m])) by (service)",
+                    "legendFormat": "{{service}}"
+                }
+            ],
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 16
+            }
+        },
+        {
+            "id": 6,
+            "title": "GraphQL Request Duration",
+            "type": "graph",
+            "targets": [
+                {
+                    "expr": "histogram_quantile(0.95, rate(graphql_request_duration_seconds_bucket[5m])) by (service)",
+                    "legendFormat": "95th percentile - {{service}}"
+                }
+            ],
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 16
+            }
+        },
+        {
+            "id": 7,
+            "title": "Memory Usage",
+            "type": "graph",
+            "targets": [
+                {
+                    "expr": "memory_usage_bytes by (service)",
+                    "legendFormat": "{{service}}"
+                }
+            ],
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 24
+            }
+        },
+        {
+            "id": 8,
+            "title": "Goroutines Count",
+            "type": "graph",
+            "targets": [
+                {
+                    "expr": "goroutines_count by (service)",
+                    "legendFormat": "{{service}}"
+                }
+            ],
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 24
+            }
+        },
+        {
+            "id": 9,
+            "title": "Database Queries Total",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "sum(rate(db_queries_total[5m])) by (service)",
+                    "legendFormat": "{{service}}"
+                }
+            ],
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 32
+            }
+        },
+        {
+            "id": 10,
+            "title": "Database Query Duration",
+            "type": "graph",
+            "targets": [
+                {
+                    "expr": "histogram_quantile(0.95, rate(db_query_duration_seconds_bucket[5m])) by (service)",
+                    "legendFormat": "95th percentile - {{service}}"
+                }
+            ],
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 32
+            }
+        },
+        {
+            "id": 11,
+            "title": "Database Connections",
+            "type": "graph",
+            "targets": [
+                {
+                    "expr": "db_connections_total by (service)",
+                    "legendFormat": "Total - {{service}}"
+                },
+                {
+                    "expr": "db_connections_active by (service)",
+                    "legendFormat": "Active - {{service}}"
+                },
+                {
+                    "expr": "db_connections_idle by (service)",
+                    "legendFormat": "Idle - {{service}}"
+                }
+            ],
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 40
+            }
+        }
+    ],
+    "time": {
+        "from": "now-1h",
+        "to": "now"
+    },
+    "refresh": "5s"
+}
+}

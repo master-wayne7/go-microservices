@@ -7,6 +7,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/master-wayne7/go-microservices/monitoring"
 )
 
 type AppConfig struct {
@@ -38,10 +39,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// ### CHANGE THIS ####
+	// ### CHANGE THIS #### - Initialize Prometheus metrics
+	metrics := monitoring.NewMetricsCollector("graphql-service")
+	metrics.SetServiceInfo("1.0.0", "development")
+
 	// Start health check server on separate port
 	go func() {
 		http.HandleFunc("/health", healthCheck)
+		// ### CHANGE THIS #### - Add Prometheus metrics endpoint
+		http.Handle("/metrics", metrics.PrometheusHandler())
 		log.Println("Health check server starting on port 8088...")
 		log.Fatal(http.ListenAndServe(":8088", nil))
 	}()
@@ -55,10 +61,14 @@ func main() {
 		log.Fatal(err)
 	}
 	graphqlHandler := handler.NewDefaultServer(s.ToExecutableSchema())
-	http.Handle("/graphql", enforceJSONContentType(graphqlHandler))
+
+	// ### CHANGE THIS #### - Add GraphQL metrics middleware
+	http.Handle("/graphql", monitoring.GraphQLMiddleware(metrics)(enforceJSONContentType(graphqlHandler)))
 	http.Handle("/playground", playground.Handler("playground", "/graphql"))
 
-	// ### CHANGE THIS ####
+	// ### CHANGE THIS #### - Start system metrics collection
+	metrics.StartSystemMetricsCollection(nil)
+
 	// Changed port from 8000 to 8087 to avoid conflicts and maintain consistency
 	log.Println("GraphQL server starting on port 8087...")
 	log.Fatal(http.ListenAndServe(":8087", nil))

@@ -13,7 +13,7 @@ type Repository interface {
 	GetOrdersForAccount(ctx context.Context, accountID string) ([]Order, error)
 }
 
-type postgresRepository struct {
+type PostgresRepository struct {
 	db *sql.DB
 }
 
@@ -26,16 +26,21 @@ func NewPostgresRepository(url string) (Repository, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &postgresRepository{
+	return &PostgresRepository{
 		db: db,
 	}, nil
 }
 
-func (r *postgresRepository) Close() {
+func (r *PostgresRepository) Close() {
 	r.db.Close()
 }
 
-func (r *postgresRepository) PutOrder(ctx context.Context, o Order) (err error) {
+// ### CHANGE THIS #### - Add DB accessor for metrics
+func (r *PostgresRepository) DB() *sql.DB {
+	return r.db
+}
+
+func (r *PostgresRepository) PutOrder(ctx context.Context, o Order) (err error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -83,7 +88,7 @@ func (r *postgresRepository) PutOrder(ctx context.Context, o Order) (err error) 
 	return
 }
 
-func (r *postgresRepository) GetOrdersForAccount(ctx context.Context, accountId string) ([]Order, error) {
+func (r *PostgresRepository) GetOrdersForAccount(ctx context.Context, accountId string) ([]Order, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
 		`SELECT

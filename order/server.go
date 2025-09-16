@@ -8,6 +8,7 @@ import (
 
 	"github.com/master-wayne7/go-microservices/account"
 	"github.com/master-wayne7/go-microservices/catalog"
+	"github.com/master-wayne7/go-microservices/monitoring"
 	"github.com/master-wayne7/go-microservices/order/pb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -20,7 +21,7 @@ type grpcServer struct {
 	catalogClient *catalog.Client
 }
 
-func ListenGRPC(s Service, accountUrl, catalogUrl string, port int) error {
+func ListenGRPC(s Service, accountUrl, catalogUrl string, port int, metrics *monitoring.MetricsCollector) error {
 	accountClient, err := account.NewClient(accountUrl)
 	if err != nil {
 		return err
@@ -37,7 +38,11 @@ func ListenGRPC(s Service, accountUrl, catalogUrl string, port int) error {
 		return err
 	}
 
-	serv := grpc.NewServer()
+	// ### CHANGE THIS #### - Add gRPC interceptors for metrics
+	serv := grpc.NewServer(
+		grpc.UnaryInterceptor(monitoring.GRPCUnaryServerInterceptor(metrics)),
+		grpc.StreamInterceptor(monitoring.GRPCStreamServerInterceptor(metrics)),
+	)
 	pb.RegisterOrderServiceServer(serv, &grpcServer{
 		service:                         s,
 		accountClient:                   accountClient,

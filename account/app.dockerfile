@@ -9,6 +9,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY account account
+COPY monitoring monitoring
 
 RUN go build -o /go/bin/app ./account/cmd/account
 

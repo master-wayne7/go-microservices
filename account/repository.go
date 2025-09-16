@@ -14,7 +14,7 @@ type Repository interface {
 	ListAccounts(ctx context.Context, skip uint64, take uint64) ([]Account, error)
 }
 
-type postgresRepository struct {
+type PostgresRepository struct {
 	db *sql.DB
 }
 
@@ -29,22 +29,28 @@ func NewPostgresRepository(url string) (Repository, error) {
 		return nil, err
 	}
 
-	return &postgresRepository{db: db}, nil
+	return &PostgresRepository{db: db}, nil
 }
 
-func (r *postgresRepository) Close() {
+func (r *PostgresRepository) Close() {
 	r.db.Close()
 }
 
-func (r *postgresRepository) Ping() error {
+func (r *PostgresRepository) Ping() error {
 	return r.db.Ping()
 }
-func (r *postgresRepository) PutAccount(ctx context.Context, a Account) error {
+
+// ### CHANGE THIS #### - Add DB accessor for metrics
+func (r *PostgresRepository) DB() *sql.DB {
+	return r.db
+}
+
+func (r *PostgresRepository) PutAccount(ctx context.Context, a Account) error {
 	_, err := r.db.ExecContext(ctx, "INSERT INTO accounts(id,name) VALUES($1,$2)", a.ID, a.Name)
 	return err
 
 }
-func (r *postgresRepository) GetAccountByID(ctx context.Context, id string) (*Account, error) {
+func (r *PostgresRepository) GetAccountByID(ctx context.Context, id string) (*Account, error) {
 	row := r.db.QueryRowContext(ctx, "SELECT id, name FROM accounts WHERE id=$1", id)
 	a := &Account{}
 	if err := row.Scan(&a.ID, &a.Name); err != nil {
@@ -52,7 +58,7 @@ func (r *postgresRepository) GetAccountByID(ctx context.Context, id string) (*Ac
 	}
 	return a, nil
 }
-func (r *postgresRepository) ListAccounts(ctx context.Context, skip uint64, take uint64) ([]Account, error) {
+func (r *PostgresRepository) ListAccounts(ctx context.Context, skip uint64, take uint64) ([]Account, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
 		"SELECT id, name FROM accounts ORDER BY id DESC OFFSET $1 LIMIT $2",

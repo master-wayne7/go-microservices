@@ -7,6 +7,7 @@ import (
 	"net"
 
 	"github.com/master-wayne7/go-microservices/account/pb"
+	"github.com/master-wayne7/go-microservices/monitoring"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -16,13 +17,17 @@ type grpcServer struct {
 	service Service
 }
 
-func ListenGRPC(s Service, port int) error {
+func ListenGRPC(s Service, port int, metrics *monitoring.MetricsCollector) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return err
 	}
 
-	serv := grpc.NewServer()
+	// ### CHANGE THIS #### - Add gRPC interceptors for metrics
+	serv := grpc.NewServer(
+		grpc.UnaryInterceptor(monitoring.GRPCUnaryServerInterceptor(metrics)),
+		grpc.StreamInterceptor(monitoring.GRPCStreamServerInterceptor(metrics)),
+	)
 	pb.RegisterAccountServiceServer(serv, &grpcServer{service: s, UnimplementedAccountServiceServer: pb.UnimplementedAccountServiceServer{}})
 	reflection.Register(serv)
 	return serv.Serve(lis)

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/master-wayne7/go-microservices/monitoring"
 	"github.com/master-wayne7/go-microservices/order"
 	"github.com/tinrab/retry"
 )
@@ -38,9 +39,16 @@ func main() {
 	if cfg.CatalogURL == "" {
 		log.Fatal("CATALOG_SERVICE_URL environment variable is required")
 	}
+
+	// ### CHANGE THIS #### - Initialize Prometheus metrics
+	metrics := monitoring.NewMetricsCollector("order-service")
+	metrics.SetServiceInfo("1.0.0", "development")
+
 	// Start health check server on separate port
 	go func() {
 		http.HandleFunc("/health", healthCheck)
+		// ### CHANGE THIS #### - Add Prometheus metrics endpoint
+		http.Handle("/metrics", metrics.PrometheusHandler())
 		log.Println("Health check server starting on port 8086...")
 		log.Fatal(http.ListenAndServe(":8086", nil))
 	}()
@@ -55,8 +63,11 @@ func main() {
 	})
 	defer r.Close()
 
+	// ### CHANGE THIS #### - Start system metrics collection
+	metrics.StartSystemMetricsCollection(r.(*order.PostgresRepository).DB())
+
 	// Changed port from 8080 to 8085 to avoid conflicts
 	log.Println("Listening on port 8085...")
 	s := order.NewService(r)
-	log.Fatal(order.ListenGRPC(s, cfg.AccountURL, cfg.CatalogURL, 8085))
+	log.Fatal(order.ListenGRPC(s, cfg.AccountURL, cfg.CatalogURL, 8085, metrics))
 }
