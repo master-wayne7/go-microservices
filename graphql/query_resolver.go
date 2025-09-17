@@ -50,7 +50,7 @@ func (q *queryResolver) Products(ctx context.Context, pagination *PaginationInpu
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	if len(id) <= 1 {
+	if len(id) == 1 && id[0] != nil {
 		r, err := q.server.catalogClient.GetProduct(ctx, *id[0])
 		if err != nil {
 			log.Println(err)
@@ -74,7 +74,11 @@ func (q *queryResolver) Products(ctx context.Context, pagination *PaginationInpu
 			stringIds[i] = *s
 		}
 	}
-	productsList, err := q.server.catalogClient.GetProducts(ctx, skip, take, *query, stringIds)
+	queryStr := ""
+	if query != nil {
+		queryStr = *query
+	}
+	productsList, err := q.server.catalogClient.GetProducts(ctx, skip, take, queryStr, stringIds)
 	if err != nil {
 		log.Println(err)
 		return nil, err

@@ -97,7 +97,7 @@ func (r *PostgresRepository) GetOrdersForAccount(ctx context.Context, accountId 
 		o.account_id,
 		o.total_price::money::numeric::float8,
 		op.product_id,
-		op.quantity,
+		op.quantity
 		FROM orders o JOIN order_products op ON(o.id = op.order_id)
 		WHERE o.account_id = $1
 		ORDER BY o.id

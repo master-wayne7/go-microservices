@@ -31,6 +31,15 @@ type elasticRepository struct {
 	client *elasticsearch.Client
 }
 
+type esSearchResponse struct {
+	Hits struct {
+		Hits []struct {
+			ID     string          `json:"_id"`
+			Source json.RawMessage `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
 type productDocument struct {
 	Name        string  `json:"name"`
 	Price       float64 `json:"price"`
@@ -183,7 +192,16 @@ func (r *elasticRepository) ListProducts(ctx context.Context, skip, take uint64)
 
 	// Extract hits
 	products := make([]Product, 0)
-	hits := p["hits"].(map[string]interface{})["hits"].([]interface{})
+	hitsMap, ok := p["hits"].(map[string]interface{})
+	if !ok {
+		return products, nil // Return empty slice if no hits
+	}
+
+	hits, ok := hitsMap["hits"].([]interface{})
+	if !ok {
+		return products, nil // Return empty slice if hits is not an array
+	}
+
 	for _, hit := range hits {
 		hitMap := hit.(map[string]interface{})
 
@@ -208,70 +226,71 @@ func (r *elasticRepository) ListProducts(ctx context.Context, skip, take uint64)
 
 }
 func (r *elasticRepository) ListProductsWithIDs(ctx context.Context, ids []string) ([]Product, error) {
-	docs := make([]map[string]interface{}, len(ids))
-	for i, id := range ids {
-		docs[i] = map[string]interface{}{"_id": id}
-	}
-
+	// Build query
 	body := map[string]interface{}{
-		"docs": docs,
+		"query": map[string]interface{}{
+			"ids": map[string]interface{}{
+				"values": ids,
+			},
+		},
 	}
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(body); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to encode query body: %w", err)
 	}
 
-	// Multi-get request
-	req := esapi.MgetRequest{
-		Index: "catalog",
-		Body:  &buf,
-	}
-
-	res, err := req.Do(ctx, r.client.Transport)
+	// Perform search
+	res, err := r.client.Search(
+		r.client.Search.WithContext(ctx),
+		r.client.Search.WithIndex("catalog"),
+		r.client.Search.WithBody(&buf),
+	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("search request failed: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return nil, fmt.Errorf("error fetching products: %s", res.String())
+		return nil, fmt.Errorf("error searching products: %s", res.String())
 	}
 
-	// Parse response
-	var p map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&p); err != nil {
-		return nil, err
+	// Decode into typed struct
+	var esResp esSearchResponse
+	if err := json.NewDecoder(res.Body).Decode(&esResp); err != nil {
+		return nil, fmt.Errorf("failed to decode search response: %w", err)
 	}
 
-	products := make([]Product, 0)
-	docsResp := p["docs"].([]interface{})
-	for _, d := range docsResp {
-		docMap := d.(map[string]interface{})
-		if found, ok := docMap["found"].(bool); ok && found {
-			id := docMap["_id"].(string)
-			src := docMap["_source"]
+	products := make([]Product, 0, len(esResp.Hits.Hits))
 
-			srcJSON, _ := json.Marshal(src)
-			var product productDocument
-			if err := json.Unmarshal(srcJSON, &product); err == nil {
-				products = append(products, Product{
-					ID:          id,
-					Name:        product.Name,
-					Description: product.Description,
-					Price:       product.Price,
-				})
-			}
+	// Convert ES docs into Product
+	for _, hit := range esResp.Hits.Hits {
+		var doc productDocument
+		if err := json.Unmarshal(hit.Source, &doc); err != nil {
+			continue // Skip invalid docs instead of failing everything
 		}
+
+		products = append(products, Product{
+			ID:          hit.ID,
+			Name:        doc.Name,
+			Description: doc.Description,
+			Price:       doc.Price,
+		})
 	}
 
 	return products, nil
 }
+
 func (r *elasticRepository) SearchProducts(ctx context.Context, query string, skip, take uint64) ([]Product, error) {
 	body := map[string]interface{}{
-		"from":  skip,
-		"size":  take,
-		"query": query,
+		"from": skip,
+		"size": take,
+		"query": map[string]interface{}{
+			"query_string": map[string]interface{}{
+				"query":  "*" + query + "*",
+				"fields": []string{"name", "description"},
+			},
+		},
 	}
 
 	var buf bytes.Buffer

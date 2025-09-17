@@ -45,11 +45,11 @@ func main() {
 
 	// Start health check server on separate port
 	go func() {
-		http.HandleFunc("/health", healthCheck)
-		// ### CHANGE THIS #### - Add Prometheus metrics endpoint
-		http.Handle("/metrics", metrics.PrometheusHandler())
+		mux := http.NewServeMux()
+		mux.HandleFunc("/health", healthCheck)
+		mux.Handle("/metrics", metrics.PrometheusHandler())
 		log.Println("Health check server starting on port 8088...")
-		log.Fatal(http.ListenAndServe(":8088", nil))
+		log.Fatal(http.ListenAndServe(":8088", mux))
 	}()
 
 	s, err := NewGraphQlServer(
