@@ -3,12 +3,16 @@ package account
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	_ "github.com/lib/pq"
+	"github.com/master-wayne7/go-microservices/monitoring"
 )
 
 type Repository interface {
 	Close()
+	// Expose DB for metrics
+	DB() *sql.DB
 	PutAccount(ctx context.Context, a Account) error
 	GetAccountByID(ctx context.Context, id string) (*Account, error)
 	ListAccounts(ctx context.Context, skip uint64, take uint64) ([]Account, error)
@@ -16,6 +20,8 @@ type Repository interface {
 
 type PostgresRepository struct {
 	db *sql.DB
+	// Attach metrics collector for DB query metrics
+	metrics *monitoring.MetricsCollector
 }
 
 func NewPostgresRepository(url string) (Repository, error) {
@@ -40,25 +46,42 @@ func (r *PostgresRepository) Ping() error {
 	return r.db.Ping()
 }
 
-// ### CHANGE THIS #### - Add DB accessor for metrics
+// Add DB accessor for metrics
 func (r *PostgresRepository) DB() *sql.DB {
 	return r.db
 }
 
+// Allow wiring metrics after repository creation
+func (r *PostgresRepository) SetMetrics(mc *monitoring.MetricsCollector) {
+	r.metrics = mc
+}
+
 func (r *PostgresRepository) PutAccount(ctx context.Context, a Account) error {
+	start := time.Now()
 	_, err := r.db.ExecContext(ctx, "INSERT INTO accounts(id,name) VALUES($1,$2)", a.ID, a.Name)
+	if r.metrics != nil {
+		r.metrics.RecordDBQuery("insert", "accounts", time.Since(start))
+	}
 	return err
 
 }
 func (r *PostgresRepository) GetAccountByID(ctx context.Context, id string) (*Account, error) {
+	start := time.Now()
 	row := r.db.QueryRowContext(ctx, "SELECT id, name FROM accounts WHERE id=$1", id)
 	a := &Account{}
 	if err := row.Scan(&a.ID, &a.Name); err != nil {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("select", "accounts", time.Since(start))
+		}
 		return nil, err
+	}
+	if r.metrics != nil {
+		r.metrics.RecordDBQuery("select", "accounts", time.Since(start))
 	}
 	return a, nil
 }
 func (r *PostgresRepository) ListAccounts(ctx context.Context, skip uint64, take uint64) ([]Account, error) {
+	start := time.Now()
 	rows, err := r.db.QueryContext(
 		ctx,
 		"SELECT id, name FROM accounts ORDER BY id DESC OFFSET $1 LIMIT $2",
@@ -66,6 +89,9 @@ func (r *PostgresRepository) ListAccounts(ctx context.Context, skip uint64, take
 		take,
 	)
 	if err != nil {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("select", "accounts", time.Since(start))
+		}
 		return nil, err
 	}
 
@@ -81,7 +107,13 @@ func (r *PostgresRepository) ListAccounts(ctx context.Context, skip uint64, take
 	}
 
 	if err := rows.Err(); err != nil {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("select", "accounts", time.Since(start))
+		}
 		return nil, err
+	}
+	if r.metrics != nil {
+		r.metrics.RecordDBQuery("select", "accounts", time.Since(start))
 	}
 	return accounts, nil
 }

@@ -23,7 +23,7 @@ func ListenGRPC(s Service, port int, metrics *monitoring.MetricsCollector) error
 		return err
 	}
 
-	// ### CHANGE THIS #### - Add gRPC interceptors for metrics
+	// Add gRPC interceptors for metrics
 	serv := grpc.NewServer(
 		grpc.UnaryInterceptor(monitoring.GRPCUnaryServerInterceptor(metrics)),
 		grpc.StreamInterceptor(monitoring.GRPCStreamServerInterceptor(metrics)),

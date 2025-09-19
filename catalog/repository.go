@@ -12,6 +12,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-elasticsearch/v9/esapi"
+	"github.com/master-wayne7/go-microservices/monitoring"
 )
 
 var (
@@ -20,6 +21,8 @@ var (
 
 type Repository interface {
 	Close()
+	// Wire metrics into repository
+	SetMetrics(mc *monitoring.MetricsCollector)
 	PutProduct(ctx context.Context, p Product) error
 	GetProductById(ctx context.Context, id string) (*Product, error)
 	ListProducts(ctx context.Context, skip, take uint64) ([]Product, error)
@@ -28,7 +31,8 @@ type Repository interface {
 }
 
 type elasticRepository struct {
-	client *elasticsearch.Client
+	client  *elasticsearch.Client
+	metrics *monitoring.MetricsCollector
 }
 
 type esSearchResponse struct {
@@ -90,7 +94,13 @@ func NewElasticRepository(url string) (Repository, error) {
 func (r *elasticRepository) Close() {
 	httpTr.CloseIdleConnections()
 }
+
+// Implement SetMetrics for repository
+func (r *elasticRepository) SetMetrics(mc *monitoring.MetricsCollector) {
+	r.metrics = mc
+}
 func (r *elasticRepository) PutProduct(ctx context.Context, p Product) error {
+	start := time.Now()
 	product := productDocument{
 		Name:        p.Name,
 		Price:       p.Price,
@@ -111,16 +121,26 @@ func (r *elasticRepository) PutProduct(ctx context.Context, p Product) error {
 
 	res, err := req.Do(ctx, r.client)
 	if err != nil {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("index", "catalog", time.Since(start))
+		}
 		return err
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("index", "catalog", time.Since(start))
+		}
 		return errors.New("error indexing document")
+	}
+	if r.metrics != nil {
+		r.metrics.RecordDBQuery("index", "catalog", time.Since(start))
 	}
 	return nil
 }
 func (r *elasticRepository) GetProductById(ctx context.Context, id string) (*Product, error) {
+	start := time.Now()
 	req := esapi.GetRequest{
 		Index:      "catalog",
 		DocumentID: id,
@@ -128,23 +148,38 @@ func (r *elasticRepository) GetProductById(ctx context.Context, id string) (*Pro
 
 	res, err := req.Do(ctx, r.client.Transport)
 	if err != nil {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("get", "catalog", time.Since(start))
+		}
 		return nil, err
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("get", "catalog", time.Since(start))
+		}
 		return nil, fmt.Errorf("error getting document ID=%s: %s", id, res.String())
 	}
 
 	// Read raw response body
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("get", "catalog", time.Since(start))
+		}
 		return nil, err
 	}
 	var p productDocument
 	err = json.Unmarshal(data, &p)
 	if err != nil {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("get", "catalog", time.Since(start))
+		}
 		return nil, err
+	}
+	if r.metrics != nil {
+		r.metrics.RecordDBQuery("get", "catalog", time.Since(start))
 	}
 	return &Product{
 		ID:          id,
@@ -154,6 +189,7 @@ func (r *elasticRepository) GetProductById(ctx context.Context, id string) (*Pro
 	}, err
 }
 func (r *elasticRepository) ListProducts(ctx context.Context, skip, take uint64) ([]Product, error) {
+	start := time.Now()
 	query := map[string]interface{}{
 		"from": skip,
 		"size": take,
@@ -176,11 +212,17 @@ func (r *elasticRepository) ListProducts(ctx context.Context, skip, take uint64)
 
 	res, err := req.Do(ctx, r.client.Transport)
 	if err != nil {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("search", "catalog", time.Since(start))
+		}
 		return nil, err
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("search", "catalog", time.Since(start))
+		}
 		return nil, fmt.Errorf("error searching products: %s", res.String())
 	}
 
@@ -194,11 +236,17 @@ func (r *elasticRepository) ListProducts(ctx context.Context, skip, take uint64)
 	products := make([]Product, 0)
 	hitsMap, ok := p["hits"].(map[string]interface{})
 	if !ok {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("search", "catalog", time.Since(start))
+		}
 		return products, nil // Return empty slice if no hits
 	}
 
 	hits, ok := hitsMap["hits"].([]interface{})
 	if !ok {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("search", "catalog", time.Since(start))
+		}
 		return products, nil // Return empty slice if hits is not an array
 	}
 
@@ -222,10 +270,14 @@ func (r *elasticRepository) ListProducts(ctx context.Context, skip, take uint64)
 		}
 	}
 
+	if r.metrics != nil {
+		r.metrics.RecordDBQuery("search", "catalog", time.Since(start))
+	}
 	return products, nil
 
 }
 func (r *elasticRepository) ListProductsWithIDs(ctx context.Context, ids []string) ([]Product, error) {
+	start := time.Now()
 	// Build query
 	body := map[string]interface{}{
 		"query": map[string]interface{}{
@@ -247,11 +299,17 @@ func (r *elasticRepository) ListProductsWithIDs(ctx context.Context, ids []strin
 		r.client.Search.WithBody(&buf),
 	)
 	if err != nil {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("mget", "catalog", time.Since(start))
+		}
 		return nil, fmt.Errorf("search request failed: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("mget", "catalog", time.Since(start))
+		}
 		return nil, fmt.Errorf("error searching products: %s", res.String())
 	}
 
@@ -278,10 +336,14 @@ func (r *elasticRepository) ListProductsWithIDs(ctx context.Context, ids []strin
 		})
 	}
 
+	if r.metrics != nil {
+		r.metrics.RecordDBQuery("mget", "catalog", time.Since(start))
+	}
 	return products, nil
 }
 
 func (r *elasticRepository) SearchProducts(ctx context.Context, query string, skip, take uint64) ([]Product, error) {
+	start := time.Now()
 	body := map[string]interface{}{
 		"from": skip,
 		"size": take,
@@ -305,11 +367,17 @@ func (r *elasticRepository) SearchProducts(ctx context.Context, query string, sk
 
 	res, err := req.Do(ctx, r.client.Transport)
 	if err != nil {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("search", "catalog", time.Since(start))
+		}
 		return nil, err
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("search", "catalog", time.Since(start))
+		}
 		return nil, fmt.Errorf("error searching products: %s", res.String())
 	}
 
@@ -339,5 +407,8 @@ func (r *elasticRepository) SearchProducts(ctx context.Context, query string, sk
 		}
 	}
 
+	if r.metrics != nil {
+		r.metrics.RecordDBQuery("search", "catalog", time.Since(start))
+	}
 	return products, nil
 }

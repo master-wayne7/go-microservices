@@ -48,12 +48,22 @@ func (c *Client) PostOrder(ctx context.Context, accountId string, products []Ord
 	newOrder := resp.Order
 	newOrderCreateAt := time.Time{}
 	newOrderCreateAt.UnmarshalBinary(newOrder.CreatedAt)
+	returnedProducts := make([]OrderedProduct, 0, len(newOrder.Products))
+	for _, p := range newOrder.Products {
+		returnedProducts = append(returnedProducts, OrderedProduct{
+			ID:          p.Id,
+			Name:        p.Name,
+			Description: p.Description,
+			Price:       p.Price,
+			Quantity:    p.Quantity,
+		})
+	}
 	return &Order{
 		ID:         newOrder.Id,
 		CreatedAt:  newOrderCreateAt,
 		TotalPrice: newOrder.TotalPrice,
 		AccountID:  newOrder.AccountId,
-		Products:   products,
+		Products:   returnedProducts,
 	}, nil
 
 }

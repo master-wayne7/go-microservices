@@ -165,7 +165,7 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ### CHANGE THIS #### - Prometheus monitoring
+  # Prometheus monitoring
   prometheus:
     image: prom/prometheus:latest
     ports:
@@ -182,7 +182,7 @@ services:
       - '--web.enable-lifecycle'
     restart: unless-stopped
 
-  # ### CHANGE THIS #### - Grafana visualization
+  # Grafana visualization
   grafana:
     image: grafana/grafana:latest
     ports:

@@ -28,15 +28,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// ### CHANGE THIS #### - Initialize Prometheus metrics
+	// Initialize Prometheus metrics
 	metrics := monitoring.NewMetricsCollector("catalog-service")
 	metrics.SetServiceInfo("1.0.0", "development")
 
 	// Start health check server on separate port
 	go func() {
 		mux := http.NewServeMux()
-		mux.HandleFunc("/health", healthCheck)
-		mux.Handle("/metrics", metrics.PrometheusHandler())
+		// Wrap health and metrics with HTTP middleware
+		mux.Handle("/health", monitoring.HTTPMiddleware(metrics)(http.HandlerFunc(healthCheck)))
+		mux.Handle("/metrics", monitoring.HTTPMiddleware(metrics)(metrics.PrometheusHandler()))
 		log.Println("Health check server starting on port 8084...")
 		log.Fatal(http.ListenAndServe(":8084", mux))
 	}()
@@ -51,7 +52,10 @@ func main() {
 	})
 	defer r.Close()
 
-	// ### CHANGE THIS #### - Start system metrics collection
+	// Wire metrics into ES repository for query metrics
+	r.SetMetrics(metrics)
+
+	// Start system metrics collection (no DB handle for ES)
 	metrics.StartSystemMetricsCollection(nil)
 
 	// Changed port from 8080 to 8083 to avoid conflicts

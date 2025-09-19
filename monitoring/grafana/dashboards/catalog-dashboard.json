@@ -1,0 +1,193 @@
+{
+    "id": null,
+    "title": "Catalog Service",
+    "tags": [
+        "catalog",
+        "prometheus"
+    ],
+    "timezone": "browser",
+    "style": "dark",
+    "refresh": "5s",
+    "time": {
+        "from": "now-1h",
+        "to": "now"
+    },
+    "panels": [
+        {
+            "id": 1,
+            "title": "CPU Usage",
+            "type": "gauge",
+            "targets": [
+                {
+                    "expr": "catalog_service_cpu_usage_percent"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent"
+                }
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 6,
+                "x": 0,
+                "y": 0
+            }
+        },
+        {
+            "id": 2,
+            "title": "Goroutines",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "catalog_service_goroutines_count"
+                }
+            ],
+            "gridPos": {
+                "h": 6,
+                "w": 6,
+                "x": 6,
+                "y": 0
+            }
+        },
+        {
+            "id": 3,
+            "title": "Uptime",
+            "type": "stat",
+            "targets": [
+                {
+                    "expr": "catalog_service_uptime_seconds"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "s"
+                }
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 6,
+                "x": 12,
+                "y": 0
+            }
+        },
+        {
+            "id": 4,
+            "title": "Memory Usage",
+            "type": "graph",
+            "targets": [
+                {
+                    "expr": "catalog_service_memory_usage_bytes"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bytes"
+                }
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 6,
+                "x": 18,
+                "y": 0
+            }
+        },
+        {
+            "id": 5,
+            "title": "HTTP Requests (raw)",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "expr": "sum by (method,endpoint,status_code) (catalog_service_http_requests_total)"
+                }
+            ],
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 0,
+                "y": 6
+            }
+        },
+        {
+            "id": 6,
+            "title": "HTTP p95 Duration",
+            "type": "graph",
+            "targets": [
+                {
+                    "expr": "histogram_quantile(0.95, rate(catalog_service_http_request_duration_seconds_bucket[5m]))"
+                }
+            ],
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 12,
+                "y": 6
+            }
+        },
+        {
+            "id": 7,
+            "title": "gRPC Requests (raw)",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "expr": "sum by (method,status_code) (catalog_service_grpc_requests_total)"
+                }
+            ],
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 0,
+                "y": 12
+            }
+        },
+        {
+            "id": 8,
+            "title": "gRPC p95 Duration",
+            "type": "graph",
+            "targets": [
+                {
+                    "expr": "histogram_quantile(0.95, rate(catalog_service_grpc_request_duration_seconds_bucket[5m]))"
+                }
+            ],
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 12,
+                "y": 12
+            }
+        },
+        {
+            "id": 9,
+            "title": "ES Ops (raw)",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "expr": "sum by (operation,table) (catalog_service_db_queries_total)"
+                }
+            ],
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 0,
+                "y": 18
+            }
+        },
+        {
+            "id": 10,
+            "title": "ES p95 Duration by op",
+            "type": "graph",
+            "targets": [
+                {
+                    "expr": "histogram_quantile(0.95, sum by (le,operation) (rate(catalog_service_db_query_duration_seconds_bucket[5m])))",
+                    "legendFormat": "{{operation}}"
+                }
+            ],
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 12,
+                "y": 18
+            }
+        }
+    ]
+}

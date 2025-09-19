@@ -3,8 +3,10 @@ package order
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/lib/pq"
+	"github.com/master-wayne7/go-microservices/monitoring"
 )
 
 type Repository interface {
@@ -15,6 +17,8 @@ type Repository interface {
 
 type PostgresRepository struct {
 	db *sql.DB
+	// Attach metrics collector for DB query metrics
+	metrics *monitoring.MetricsCollector
 }
 
 func NewPostgresRepository(url string) (Repository, error) {
@@ -35,12 +39,13 @@ func (r *PostgresRepository) Close() {
 	r.db.Close()
 }
 
-// ### CHANGE THIS #### - Add DB accessor for metrics
+// Add DB accessor for metrics
 func (r *PostgresRepository) DB() *sql.DB {
 	return r.db
 }
 
 func (r *PostgresRepository) PutOrder(ctx context.Context, o Order) (err error) {
+	startTx := time.Now()
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -53,6 +58,7 @@ func (r *PostgresRepository) PutOrder(ctx context.Context, o Order) (err error) 
 		}
 		err = tx.Commit()
 	}()
+	startInsert := time.Now()
 	_, err = tx.ExecContext(
 		ctx,
 		"INSERT INTO orders(id, created_at, account_id, total_price) VALUES($1, $2, $3, $4)",
@@ -64,10 +70,14 @@ func (r *PostgresRepository) PutOrder(ctx context.Context, o Order) (err error) 
 	if err != nil {
 		return err
 	}
+	if r.metrics != nil {
+		r.metrics.RecordDBQuery("insert", "orders", time.Since(startInsert))
+	}
 
 	stmt, _ := tx.PrepareContext(ctx, pq.CopyIn("order_products", "order_id", "product_id", "quantity"))
 
 	for _, p := range o.Products {
+		startCopy := time.Now()
 		_, err = stmt.ExecContext(
 			ctx,
 			o.ID,
@@ -77,18 +87,29 @@ func (r *PostgresRepository) PutOrder(ctx context.Context, o Order) (err error) 
 		if err != nil {
 			return err
 		}
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("copy", "order_products", time.Since(startCopy))
+		}
 	}
 
+	startCopyFlush := time.Now()
 	_, err = stmt.ExecContext(ctx)
 	if err != nil {
 		return err
 	}
+	if r.metrics != nil {
+		r.metrics.RecordDBQuery("copy", "order_products", time.Since(startCopyFlush))
+	}
 
 	stmt.Close()
+	if r.metrics != nil {
+		r.metrics.RecordDBQuery("tx", "orders", time.Since(startTx))
+	}
 	return
 }
 
 func (r *PostgresRepository) GetOrdersForAccount(ctx context.Context, accountId string) ([]Order, error) {
+	start := time.Now()
 	rows, err := r.db.QueryContext(
 		ctx,
 		`SELECT
@@ -105,6 +126,9 @@ func (r *PostgresRepository) GetOrdersForAccount(ctx context.Context, accountId 
 		accountId,
 	)
 	if err != nil {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("select", "orders_join_order_products", time.Since(start))
+		}
 		return nil, err
 	}
 	defer rows.Close()
@@ -126,6 +150,7 @@ func (r *PostgresRepository) GetOrdersForAccount(ctx context.Context, accountId 
 			return nil, err
 		}
 		if lastOrder.ID != "" && lastOrder.ID != order.ID {
+			lastOrder.Products = products
 			newOrder := Order{
 				ID:         lastOrder.ID,
 				AccountID:  lastOrder.AccountID,
@@ -144,6 +169,7 @@ func (r *PostgresRepository) GetOrdersForAccount(ctx context.Context, accountId 
 	}
 
 	if lastOrder.ID != "" {
+		lastOrder.Products = products
 		newOrder := Order{
 			ID:         lastOrder.ID,
 			AccountID:  lastOrder.AccountID,
@@ -155,7 +181,18 @@ func (r *PostgresRepository) GetOrdersForAccount(ctx context.Context, accountId 
 	}
 
 	if err = rows.Err(); err != nil {
+		if r.metrics != nil {
+			r.metrics.RecordDBQuery("select", "orders_join_order_products", time.Since(start))
+		}
 		return nil, err
 	}
+	if r.metrics != nil {
+		r.metrics.RecordDBQuery("select", "orders_join_order_products", time.Since(start))
+	}
 	return orders, nil
+}
+
+// Allow wiring metrics into repository
+func (r *PostgresRepository) SetMetrics(mc *monitoring.MetricsCollector) {
+	r.metrics = mc
 }

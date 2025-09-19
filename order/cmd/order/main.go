@@ -40,15 +40,16 @@ func main() {
 		log.Fatal("CATALOG_SERVICE_URL environment variable is required")
 	}
 
-	// ### CHANGE THIS #### - Initialize Prometheus metrics
+	// Initialize Prometheus metrics
 	metrics := monitoring.NewMetricsCollector("order-service")
 	metrics.SetServiceInfo("1.0.0", "development")
 
 	// Start health check server on separate port
 	go func() {
 		mux := http.NewServeMux()
-		mux.HandleFunc("/health", healthCheck)
-		mux.Handle("/metrics", metrics.PrometheusHandler())
+		// Wrap health and metrics endpoints with HTTP metrics
+		mux.Handle("/health", monitoring.HTTPMiddleware(metrics)(http.HandlerFunc(healthCheck)))
+		mux.Handle("/metrics", monitoring.HTTPMiddleware(metrics)(metrics.PrometheusHandler()))
 		log.Println("Health check server starting on port 8086...")
 		log.Fatal(http.ListenAndServe(":8086", mux))
 	}()
@@ -63,7 +64,12 @@ func main() {
 	})
 	defer r.Close()
 
-	// ### CHANGE THIS #### - Start system metrics collection
+	// Wire metrics into repository for DB query metrics
+	if pr, ok := r.(*order.PostgresRepository); ok {
+		pr.SetMetrics(metrics)
+	}
+
+	// Start system metrics collection
 	metrics.StartSystemMetricsCollection(r.(*order.PostgresRepository).DB())
 
 	// Changed port from 8080 to 8085 to avoid conflicts

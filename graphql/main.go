@@ -39,15 +39,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// ### CHANGE THIS #### - Initialize Prometheus metrics
+	// Initialize Prometheus metrics
 	metrics := monitoring.NewMetricsCollector("graphql-service")
 	metrics.SetServiceInfo("1.0.0", "development")
 
 	// Start health check server on separate port
 	go func() {
 		mux := http.NewServeMux()
-		mux.HandleFunc("/health", healthCheck)
-		mux.Handle("/metrics", metrics.PrometheusHandler())
+		// Wrap health and metrics with HTTP metrics middleware
+		mux.Handle("/health", monitoring.HTTPMiddleware(metrics)(http.HandlerFunc(healthCheck)))
+		mux.Handle("/metrics", monitoring.HTTPMiddleware(metrics)(metrics.PrometheusHandler()))
 		log.Println("Health check server starting on port 8088...")
 		log.Fatal(http.ListenAndServe(":8088", mux))
 	}()
@@ -62,11 +63,11 @@ func main() {
 	}
 	graphqlHandler := handler.NewDefaultServer(s.ToExecutableSchema())
 
-	// ### CHANGE THIS #### - Add GraphQL metrics middleware
-	http.Handle("/graphql", monitoring.GraphQLMiddleware(metrics)(enforceJSONContentType(graphqlHandler)))
-	http.Handle("/playground", playground.Handler("playground", "/graphql"))
+	// Add GraphQL metrics + HTTP metrics middleware
+	http.Handle("/graphql", monitoring.HTTPMiddleware(metrics)(monitoring.GraphQLMiddleware(metrics)(enforceJSONContentType(graphqlHandler))))
+	http.Handle("/playground", monitoring.HTTPMiddleware(metrics)(playground.Handler("playground", "/graphql")))
 
-	// ### CHANGE THIS #### - Start system metrics collection
+	// Start system metrics collection
 	metrics.StartSystemMetricsCollection(nil)
 
 	// Changed port from 8000 to 8087 to avoid conflicts and maintain consistency

@@ -3,12 +3,15 @@ package monitoring
 import (
 	"database/sql"
 	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	// Use gopsutil for accurate CPU metrics
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 // MetricsCollector holds all Prometheus metrics and a private registry
@@ -43,6 +46,9 @@ type MetricsCollector struct {
 	serviceInfo *prometheus.GaugeVec
 
 	startTime time.Time
+
+	// Track process for CPU usage
+	proc *process.Process
 }
 
 // NewMetricsCollector creates a new metrics collector for a service with its own registry
@@ -188,6 +194,12 @@ func NewMetricsCollector(serviceName string) *MetricsCollector {
 		serviceInfo,
 	)
 
+	// Initialize process handle for CPU metrics
+	var procHandle *process.Process
+	if p, err := process.NewProcess(int32(os.Getpid())); err == nil {
+		procHandle = p
+	}
+
 	return &MetricsCollector{
 		registry:               reg,
 		serviceName:            serviceName,
@@ -208,6 +220,7 @@ func NewMetricsCollector(serviceName string) *MetricsCollector {
 		dbConnectionsIdle:      dbConnectionsIdle,
 		serviceInfo:            serviceInfo,
 		startTime:              time.Now(),
+		proc:                   procHandle,
 	}
 }
 
@@ -249,8 +262,13 @@ func (mc *MetricsCollector) UpdateSystemMetrics() {
 	mc.goroutinesGauge.Set(float64(runtime.NumGoroutine()))
 	mc.uptimeGauge.Set(time.Since(mc.startTime).Seconds())
 
-	// Placeholder for CPU - replace with a real measurement in production
-	mc.cpuUsageGauge.Set(float64(runtime.NumGoroutine()) * 0.1)
+	// Use process CPU percentage
+	if mc.proc != nil {
+		// Percent(0) reports CPU percent since last call; safe for periodic sampling
+		if pct, err := mc.proc.Percent(0); err == nil {
+			mc.cpuUsageGauge.Set(pct)
+		}
+	}
 }
 
 // UpdateDBMetrics updates database connection metrics

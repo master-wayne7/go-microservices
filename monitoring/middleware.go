@@ -1,7 +1,10 @@
 package monitoring
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -116,24 +119,39 @@ func GraphQLMiddleware(metrics *MetricsCollector) func(http.Handler) http.Handle
 			wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 
 			// Call the next handler
+			// Capture and restore body for parsing operation
+			var bodyBytes []byte
+			if r.Body != nil {
+				bodyBytes, _ = io.ReadAll(r.Body)
+				r.Body.Close()
+				r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+			}
 			next.ServeHTTP(wrapped, r)
 
 			// Record metrics
 			duration := time.Since(start)
 			statusCode := strconv.Itoa(wrapped.statusCode)
 
-			// ### CHANGE THIS #### - Extract GraphQL operation name from request
-			// This is a simplified implementation. You might want to parse the GraphQL query
-			// to extract the actual operation name
+			// Extract GraphQL operation name from request body
 			operation := "unknown"
-			if r.Method == "POST" {
-				// Try to extract operation from request body or headers
-				operation = r.Header.Get("X-GraphQL-Operation")
-				if operation == "" {
-					operation = "mutation" // Default assumption for POST requests
+			if r.Method == "POST" && len(bodyBytes) > 0 {
+				var payload struct {
+					OperationName string `json:"operationName"`
+					Query         string `json:"query"`
 				}
-			} else {
-				operation = "query" // Default for GET requests
+				if err := json.Unmarshal(bodyBytes, &payload); err == nil {
+					if payload.OperationName != "" {
+						operation = payload.OperationName
+					} else if len(payload.Query) > 0 {
+						// Heuristic: determine if query starts with mutation or query
+						q := bytes.TrimSpace([]byte(payload.Query))
+						if bytes.HasPrefix(bytes.ToLower(q), []byte("mutation")) {
+							operation = "mutation"
+						} else if bytes.HasPrefix(bytes.ToLower(q), []byte("query")) {
+							operation = "query"
+						}
+					}
+				}
 			}
 
 			metrics.RecordGraphQLRequest(

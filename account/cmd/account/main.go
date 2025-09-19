@@ -35,8 +35,9 @@ func main() {
 	// start health + metrics server
 	go func() {
 		mux := http.NewServeMux()
-		mux.HandleFunc("/health", healthCheck)
-		mux.Handle("/metrics", metrics.PrometheusHandler()) // <--- use instance handler
+		// Wrap health and metrics with HTTP metrics middleware
+		mux.Handle("/health", monitoring.HTTPMiddleware(metrics)(http.HandlerFunc(healthCheck)))
+		mux.Handle("/metrics", monitoring.HTTPMiddleware(metrics)(metrics.PrometheusHandler()))
 		log.Println("Health + metrics server starting on port 8082...")
 		log.Fatal(http.ListenAndServe(":8082", mux))
 	}()
@@ -52,8 +53,14 @@ func main() {
 	})
 	defer r.Close()
 
-	// ✅ Start system metrics collection (CPU, RAM, disk, uptime)
-	metrics.StartSystemMetricsCollection(nil)
+	// Wire metrics into repository for DB query metrics
+	if pr, ok := r.(*account.PostgresRepository); ok {
+		pr.SetMetrics(metrics)
+	}
+
+	// ✅ Start system + DB metrics collection
+	// Pass DB handle for DB metrics
+	metrics.StartSystemMetricsCollection(r.(*account.PostgresRepository).DB())
 
 	// ✅ Start gRPC server with metrics interceptors
 	log.Println("Account service gRPC listening on port 8081...")

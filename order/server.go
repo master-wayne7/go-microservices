@@ -38,7 +38,7 @@ func ListenGRPC(s Service, accountUrl, catalogUrl string, port int, metrics *mon
 		return err
 	}
 
-	// ### CHANGE THIS #### - Add gRPC interceptors for metrics
+	// Add gRPC interceptors for metrics
 	serv := grpc.NewServer(
 		grpc.UnaryInterceptor(monitoring.GRPCUnaryServerInterceptor(metrics)),
 		grpc.StreamInterceptor(monitoring.GRPCStreamServerInterceptor(metrics)),
@@ -98,6 +98,7 @@ func (s *grpcServer) PostOrder(ctx context.Context, r *pb.PostOrderRequest) (*pb
 		AccountId: order.AccountID,
 		Products:  []*pb.Order_OrderProduct{},
 	}
+	orderProto.TotalPrice = order.TotalPrice
 	orderProto.CreatedAt, err = order.CreatedAt.MarshalBinary()
 	if err != nil {
 		log.Printf("Failed to marshal CreatedAt: %v", err)
@@ -151,6 +152,7 @@ func (s *grpcServer) GetOrdersForAccount(
 			Id:        o.ID,
 			Products:  []*pb.Order_OrderProduct{},
 		}
+		op.TotalPrice = o.TotalPrice
 		op.CreatedAt, err = o.CreatedAt.MarshalBinary()
 		if err != nil {
 			log.Printf("Failed to marshal CreatedAt for order %s: %v", o.ID, err)
